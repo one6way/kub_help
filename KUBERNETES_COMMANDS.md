@@ -13,6 +13,14 @@
 - [Мониторинг](#мониторинг)
 - [Ingress](#ingress)
 - [Хранилище](#хранилище)
+- [Продвинутые техники](#продвинутые-техники)
+- [Производительность и диагностика](#производительность-и-диагностика)
+- [Безопасность](#безопасность)
+- [CI/CD и автоматизация](#cicd-и-автоматизация)
+- [Управление хранилищем](#управление-хранилищем)
+- [Service Mesh](#service-mesh)
+- [Работа с контейнерами](#работа-с-контейнерами)
+- [Поиск и устранение неисправностей](#поиск-и-устранение-неисправностей)
 
 ## 🖥️ Управление узлами
 
@@ -351,6 +359,339 @@ kubectl get storageclasses
 
 # Установка класса по умолчанию
 kubectl patch storageclass <name> -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+```
+
+## 🎯 Продвинутые техники
+
+### 🔍 Отладка подов
+```bash
+# Запуск временного пода для отладки
+kubectl run debug-pod --image=busybox --rm -it -- sh
+
+# Копирование файлов из/в под
+kubectl cp <pod-name>:/path/to/file /local/path
+kubectl cp /local/path <pod-name>:/path/in/pod
+
+# Проброс портов
+kubectl port-forward <pod-name> 8080:80
+
+# Получение спецификации запущенного пода
+kubectl get pod <pod-name> -o yaml > pod-spec.yaml
+```
+
+### 🔧 Управление контекстами
+```bash
+# Просмотр всех контекстов
+kubectl config get-contexts
+
+# Переключение контекста
+kubectl config use-context <context-name>
+
+# Установка namespace для контекста
+kubectl config set-context --current --namespace=<namespace>
+
+# Просмотр текущего контекста
+kubectl config current-context
+```
+
+### 🛠️ Работа с манифестами
+```bash
+# Валидация манифеста
+kubectl apply --validate=true --dry-run=client -f manifest.yaml
+
+# Просмотр различий перед применением
+kubectl diff -f manifest.yaml
+
+# Применение манифеста с записью причины изменения
+kubectl apply -f manifest.yaml --record
+
+# Создание манифеста из запущенного ресурса
+kubectl get deployment <name> -o yaml > deployment.yaml
+```
+
+## 📊 Производительность и диагностика
+
+### 🔍 Метрики и мониторинг
+```bash
+# Метрики подов
+kubectl top pods --all-namespaces --sort-by=cpu
+kubectl top pods --all-namespaces --sort-by=memory
+
+# Метрики узлов с сортировкой
+kubectl top nodes --sort-by=cpu
+kubectl top nodes --sort-by=memory
+
+# Просмотр использования ресурсов в реальном времени
+kubectl top pods --watch
+
+# Подробная информация о потреблении ресурсов
+kubectl describe pod <pod-name> | grep -A 5 "Resources"
+```
+
+### 🔧 Диагностика кластера
+```bash
+# Проверка состояния компонентов кластера
+kubectl get componentstatuses
+
+# Проверка состояния API сервера
+kubectl get --raw /healthz
+kubectl get --raw /readyz
+kubectl get --raw /livez
+
+# Проверка метрик API сервера
+kubectl get --raw /metrics
+
+# Диагностика DNS
+kubectl run dnsutils --image=tutum/dnsutils --command -- sleep infinity
+kubectl exec -it dnsutils -- dig kubernetes.default.svc.cluster.local
+```
+
+### 📈 Аудит и события
+```bash
+# Просмотр событий с сортировкой по времени
+kubectl get events --sort-by='.metadata.creationTimestamp'
+
+# События определенного пода
+kubectl get events --field-selector involvedObject.name=<pod-name>
+
+# События с фильтрацией по типу
+kubectl get events --field-selector type=Warning
+
+# Экспорт событий в файл
+kubectl get events -A -o yaml > cluster-events.yaml
+```
+
+## 🔒 Безопасность
+
+### 🛡️ Pod Security Policies
+```bash
+# Просмотр Pod Security Policies
+kubectl get psp
+
+# Создание PSP
+kubectl create psp restricted --dry-run=client -o yaml > psp.yaml
+
+# Проверка применения PSP
+kubectl auth can-i use podsecuritypolicy/restricted
+
+# Привязка PSP к сервисному аккаунту
+kubectl create rolebinding psp:sa:restricted --role=psp:restricted --serviceaccount=<namespace>:<serviceaccount>
+```
+
+### 🔐 Управление сертификатами
+```bash
+# Просмотр сертификатов
+kubectl get csr
+
+# Одобрение сертификата
+kubectl certificate approve <csr-name>
+
+# Отклонение сертификата
+kubectl certificate deny <csr-name>
+
+# Создание нового сертификата
+kubectl create csr <name> --from-file=<name>.csr
+```
+
+### 🔑 Secrets Management
+```bash
+# Создание TLS секрета
+kubectl create secret tls my-tls --cert=path/to/cert --key=path/to/key
+
+# Создание docker-registry секрета
+kubectl create secret docker-registry regcred \
+  --docker-server=<registry-server> \
+  --docker-username=<username> \
+  --docker-password=<password> \
+  --docker-email=<email>
+
+# Создание секрета из файлов
+kubectl create secret generic my-secret \
+  --from-file=ssh-privatekey=~/.ssh/id_rsa \
+  --from-file=ssh-publickey=~/.ssh/id_rsa.pub
+
+# Обновление секрета
+kubectl create secret generic my-secret \
+  --from-file=./username.txt \
+  --from-file=./password.txt \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+## 🔄 CI/CD и автоматизация
+
+### 📦 Работа с образами
+```bash
+# Обновление образа
+kubectl set image deployment/<name> container=new-image:tag
+
+# Проверка истории обновлений
+kubectl rollout history deployment/<name>
+
+# Откат к предыдущей версии
+kubectl rollout undo deployment/<name>
+
+# Откат к конкретной версии
+kubectl rollout undo deployment/<name> --to-revision=2
+```
+
+### 🚀 Канареечные развертывания
+```bash
+# Создание канареечного деплоймента
+kubectl create deployment canary --image=app:v2 --replicas=1
+
+# Создание сервиса с селектором версии
+kubectl create service clusterip canary --tcp=80:8080
+
+# Обновление меток для маршрутизации
+kubectl label pods -l app=myapp version=v1
+kubectl label pods -l app=myapp version=v2
+
+# Масштабирование канареечного деплоймента
+kubectl scale deployment canary --replicas=3
+```
+
+### 📊 Мониторинг развертывания
+```bash
+# Просмотр статуса развертывания
+kubectl rollout status deployment/<name>
+
+# Пауза развертывания
+kubectl rollout pause deployment/<name>
+
+# Возобновление развертывания
+kubectl rollout resume deployment/<name>
+
+# Проверка доступности приложения
+kubectl run -it --rm test-api --image=busybox -- wget -qO- http://my-service
+```
+
+## 🗄️ Управление хранилищем
+
+### 💾 Persistent Volumes
+```bash
+# Создание PV
+kubectl create -f pv.yaml
+
+# Просмотр PV с сортировкой по размеру
+kubectl get pv --sort-by=.spec.capacity.storage
+
+# Просмотр PVC
+kubectl get pvc --all-namespaces
+
+# Удаление PV с сохранением данных
+kubectl patch pv <pv-name> -p '{"metadata":{"finalizers":null}}'
+```
+
+### 📁 Storage Classes
+```bash
+# Просмотр storage classes
+kubectl get storageclass
+
+# Создание storage class
+kubectl create -f storageclass.yaml
+
+# Установка класса по умолчанию
+kubectl patch storageclass <name> -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+
+# Просмотр использования storage class
+kubectl get pv -o custom-columns=NAME:.metadata.name,STORAGECLASS:.spec.storageClassName
+```
+
+## 🌐 Service Mesh
+
+### 🔄 Istio
+```bash
+# Проверка инъекции sidecar
+kubectl get namespace -L istio-injection
+
+# Включение инъекции sidecar для namespace
+kubectl label namespace <namespace> istio-injection=enabled
+
+# Проверка Istio конфигурации
+kubectl get virtualservices,destinationrules,gateways -A
+
+# Просмотр метрик Istio
+kubectl -n istio-system port-forward svc/prometheus 9090:9090
+```
+
+### 🔍 Service Discovery
+```bash
+# Просмотр endpoints
+kubectl get endpoints
+
+# Проверка DNS
+kubectl run -it --rm debug --image=busybox -- nslookup kubernetes.default
+
+# Просмотр сервисов с селекторами
+kubectl get svc -o custom-columns=NAME:.metadata.name,SELECTOR:.spec.selector
+
+# Проверка сервисных аккаунтов
+kubectl get serviceaccounts
+```
+
+## 🐳 Работа с контейнерами
+
+### 📊 Управление ресурсами контейнера
+```bash
+# Просмотр использования ресурсов
+kubectl top pod <pod-name> --containers
+
+# Изменение ресурсов контейнера
+kubectl set resources deployment <name> -c=<container> --limits=cpu=200m,memory=512Mi
+
+# Просмотр лимитов контейнера
+kubectl get pod <pod-name> -o jsonpath='{.spec.containers[*].resources}'
+
+# Проверка QoS класса пода
+kubectl get pod <pod-name> -o jsonpath='{.status.qosClass}'
+```
+
+### 🔍 Отладка контейнеров
+```bash
+# Запуск команды в контейнере
+kubectl exec -it <pod-name> -c <container-name> -- /bin/sh
+
+# Просмотр переменных окружения
+kubectl exec <pod-name> -c <container-name> -- printenv
+
+# Проверка файловой системы
+kubectl exec <pod-name> -c <container-name> -- ls -la /
+
+# Копирование файлов
+kubectl cp <pod-name>:/path/file ./local/path -c <container-name>
+```
+
+## 🔍 Поиск и устранение неисправностей
+
+### 📝 Сбор информации
+```bash
+# Создание дампа состояния кластера
+kubectl cluster-info dump > cluster-dump.txt
+
+# Проверка журналов системных компонентов
+kubectl logs -n kube-system -l k8s-app=kube-dns
+kubectl logs -n kube-system -l component=kube-apiserver
+
+# Проверка состояния узлов
+kubectl describe nodes | grep -A 5 "Conditions"
+
+# Поиск проблемных подов
+kubectl get pods --all-namespaces -o wide | grep -v Running
+```
+
+### 🛠️ Инструменты отладки
+```bash
+# Запуск отладочного пода
+kubectl run debug --image=nicolaka/netshoot -it --rm -- /bin/bash
+
+# Проверка сетевой связности
+kubectl run test-connectivity --image=busybox --rm -it -- wget -qO- http://service-name
+
+# Проверка DNS
+kubectl run test-dns --image=busybox --rm -it -- nslookup kubernetes.default
+
+# Анализ сетевых политик
+kubectl run test-netpol --image=busybox --rm -it -- nc -zv service-name 80
 ```
 
 ## 📚 Дополнительные ресурсы
