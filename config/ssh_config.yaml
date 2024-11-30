@@ -1,0 +1,14 @@
+# SSH Configuration
+# Replace these values with your actual SSH credentials
+
+ssh:
+  host: "95.163.229.168"  # Server IP
+  user: "root"  # SSH username
+  password: "0TzqdpsLz1olIto7"  # SSH password
+  port: 22  # SSH port (default: 22)
+
+server:
+  kubernetes:
+    version: "1.26.0"  # Kubernetes version to install
+  kubesphere:
+    version: "3.3.0"  # KubeSphere version to install
