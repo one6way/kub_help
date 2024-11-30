@@ -21,6 +21,13 @@
 - [Service Mesh](#service-mesh)
 - [Работа с контейнерами](#работа-с-контейнерами)
 - [Поиск и устранение неисправностей](#поиск-и-устранение-неисправностей)
+- [Мониторинг производительности](#мониторинг-производительности)
+- [Безопасность кластера](#безопасность-кластера)
+- [Управление состоянием](#управление-состоянием)
+- [Оптимизация производительности](#оптимизация-производительности)
+- [Тестирование и качество](#тестирование-и-качество)
+- [Расширенное управление](#расширенное-управление)
+- [Анализ и отчетность](#анализ-и-отчетность)
 
 ## 🖥️ Управление узлами
 
@@ -718,3 +725,240 @@ MIT License - свободно используйте для ваших прое
 ---
 
 🌟 Надеемся, это руководство поможет вам в работе с Kubernetes!
+
+## 🌡️ Мониторинг производительности
+
+### 📊 Prometheus и Grafana
+```bash
+# Установка Prometheus оператора
+kubectl create namespace monitoring
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm install prometheus prometheus-community/kube-prometheus-stack -n monitoring
+
+# Проверка метрик Prometheus
+kubectl port-forward -n monitoring svc/prometheus-operated 9090:9090
+# Откройте http://localhost:9090 в браузере
+
+# Доступ к Grafana
+kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
+# Откройте http://localhost:3000 в браузере
+```
+
+### 📈 Метрики приложений
+```bash
+# Просмотр метрик HPA
+kubectl get hpa -w
+
+# Мониторинг использования ресурсов пода
+kubectl top pod <pod-name> --containers
+
+# Экспорт метрик в формате Prometheus
+kubectl get --raw /metrics
+
+# Просмотр метрик узла
+kubectl top node --sort-by=cpu
+```
+
+## 🔐 Безопасность кластера
+
+### 🛡️ Network Policies
+```bash
+# Создание базовой Network Policy
+cat <<EOF | kubectl apply -f -
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+EOF
+
+# Проверка Network Policies
+kubectl get networkpolicies --all-namespaces
+
+# Анализ правил Network Policy
+kubectl describe networkpolicy <policy-name>
+
+# Удаление Network Policy
+kubectl delete networkpolicy <policy-name>
+```
+
+### 🔒 RBAC расширенные настройки
+```bash
+# Создание сервисного аккаунта с ограниченными правами
+kubectl create serviceaccount restricted-user
+kubectl create role pod-reader --verb=get,list,watch --resource=pods
+kubectl create rolebinding restricted-user-binding --role=pod-reader --serviceaccount=default:restricted-user
+
+# Проверка прав
+kubectl auth can-i --as=system:serviceaccount:default:restricted-user get pods
+kubectl auth can-i --as=system:serviceaccount:default:restricted-user delete pods
+
+# Аудит RBAC
+kubectl get clusterroles,clusterrolebindings --all-namespaces -o wide
+```
+
+## 🔄 Управление состоянием
+
+### 💾 Резервное копирование
+```bash
+# Резервное копирование всех ресурсов
+kubectl get all --all-namespaces -o yaml > cluster-backup.yaml
+
+# Резервное копирование секретов
+kubectl get secrets --all-namespaces -o yaml > secrets-backup.yaml
+
+# Резервное копирование ConfigMaps
+kubectl get configmaps --all-namespaces -o yaml > configmaps-backup.yaml
+
+# Резервное копирование PV и PVC
+kubectl get pv,pvc --all-namespaces -o yaml > storage-backup.yaml
+```
+
+### 🔄 Миграция ресурсов
+```bash
+# Экспорт ресурсов из namespace
+kubectl get all -n source-namespace -o yaml > namespace-export.yaml
+
+# Изменение namespace в экспортированном файле
+sed -i 's/source-namespace/target-namespace/g' namespace-export.yaml
+
+# Применение ресурсов в новом namespace
+kubectl apply -f namespace-export.yaml -n target-namespace
+```
+
+## 🎯 Оптимизация производительности
+
+### 🚀 Оптимизация ресурсов
+```bash
+# Анализ использования ресурсов
+kubectl describe nodes | grep -A 5 "Allocated resources"
+
+# Поиск подов с высоким потреблением CPU
+kubectl top pods --all-namespaces --sort-by=cpu | head -10
+
+# Поиск подов с высоким потреблением памяти
+kubectl top pods --all-namespaces --sort-by=memory | head -10
+
+# Анализ QoS классов
+kubectl get pods -o custom-columns=NAME:.metadata.name,QOS:.status.qosClass
+```
+
+### ⚡ Оптимизация сети
+```bash
+# Анализ сетевых эндпоинтов
+kubectl get endpoints --all-namespaces
+
+# Проверка DNS производительности
+kubectl run dns-test --image=busybox:1.28 --rm -it -- sh -c 'time nslookup kubernetes.default.svc.cluster.local'
+
+# Анализ сервисов и их эндпоинтов
+kubectl get svc --all-namespaces -o custom-columns=NAME:.metadata.name,TYPE:.spec.type,CLUSTER-IP:.spec.clusterIP,EXTERNAL-IP:.status.loadBalancer.ingress[0].ip
+```
+
+## 🔍 Тестирование и качество
+
+### 🔍 Тестирование кластера
+```bash
+# Проверка компонентов кластера
+kubectl get componentstatuses
+
+# Тестирование DNS
+kubectl run -it --rm --restart=Never dns-test --image=busybox:1.28 -- nslookup kubernetes.default
+
+# Тестирование сетевой связности
+kubectl run -it --rm --restart=Never net-test --image=busybox:1.28 -- wget -qO- http://kubernetes.default.svc.cluster.local
+
+# Проверка API сервера
+kubectl get --raw /healthz
+```
+
+### 📋 Проверка конфигурации
+```bash
+# Валидация YAML файлов
+kubectl apply --validate=true --dry-run=client -f manifest.yaml
+
+# Проверка синтаксиса манифестов
+kubectl create --dry-run=client -f deployment.yaml -o yaml
+
+# Анализ различий перед применением
+kubectl diff -f manifest.yaml
+
+# Проверка статуса развертывания
+kubectl rollout status deployment/<deployment-name>
+```
+
+## 🎛️ Расширенное управление
+
+### 🔧 Custom Resources
+```bash
+# Создание Custom Resource Definition
+kubectl create -f custom-resource.yaml
+
+# Просмотр Custom Resources
+kubectl get crd
+
+# Просмотр экземпляров Custom Resource
+kubectl get <custom-resource-name>
+
+# Описание Custom Resource
+kubectl describe crd <crd-name>
+```
+
+### 🎮 Kubectl плагины
+```bash
+# Установка kubectl-krew (менеджер плагинов)
+(
+  set -x; cd "$(mktemp -d)" &&
+  OS="$(uname | tr '[:upper:]' '[:lower:]')" &&
+  ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/\(arm\)\(64\)\?.*/\1\2/' -e 's/aarch64$/arm64/')" &&
+  KREW="krew-${OS}_${ARCH}" &&
+  curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/${KREW}.tar.gz" &&
+  tar zxvf "${KREW}.tar.gz" &&
+  ./"${KREW}" install krew
+)
+
+# Установка полезных плагинов
+kubectl krew install ctx
+kubectl krew install ns
+kubectl krew install neat
+kubectl krew install tree
+
+# Использование плагинов
+kubectl ctx  # переключение контекста
+kubectl ns   # переключение namespace
+```
+
+## 📊 Анализ и отчетность
+
+### 📈 Сбор метрик
+```bash
+# Экспорт метрик в JSON
+kubectl top pods --all-namespaces -o json > pods-metrics.json
+
+# Анализ использования ресурсов по namespace
+kubectl describe resourcequota --all-namespaces
+
+# Создание отчета по подам
+kubectl get pods --all-namespaces -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,STATUS:.status.phase,NODE:.spec.nodeName > pods-report.txt
+
+# Анализ событий кластера
+kubectl get events --sort-by='.metadata.creationTimestamp' > cluster-events.txt
+```
+
+### 📋 Аудит конфигурации
+```bash
+# Проверка конфигурации безопасности
+kubectl auth can-i --list
+
+# Анализ сетевых политик
+kubectl get networkpolicies --all-namespaces -o yaml > network-policies.yaml
+
+# Проверка конфигурации хранилища
+kubectl get sc,pv,pvc --all-namespaces -o yaml > storage-config.yaml
+
+# Экспорт конфигурации RBAC
+kubectl get clusterroles,clusterrolebindings -o yaml > rbac-config.yaml
