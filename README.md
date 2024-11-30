@@ -52,6 +52,130 @@ kubectl cluster-info
 helm version
 ```
 
+## 🚀 Быстрый старт
+
+### 📋 Предварительные требования
+
+- Linux/Unix-совместимая операционная система
+- Docker 20.10.x или выше
+- Минимум 2 CPU и 4GB RAM для узла
+- Доступ к интернету для загрузки образов
+- Sudo/root права для установки компонентов
+
+### 🛠 Варианты установки
+
+1. **Автоматическая установка на удаленный сервер**
+   ```bash
+   # 1. Установите переменные окружения
+   export SERVER_IP="your_server_ip"
+   export SERVER_USER="your_username"
+   export SERVER_PASSWORD="your_password"
+   
+   # 2. Запустите скрипт развертывания
+   ./scripts/deploy.sh
+   ```
+
+2. **Установка на локальный кластер**
+   ```bash
+   # 1. Инициализация сервера
+   ./scripts/init_server.sh
+   
+   # 2. Установка Kubernetes
+   ./scripts/install_kubernetes.sh
+   
+   # 3. Установка KubeSphere
+   ./scripts/install_kubesphere.sh
+   ```
+
+3. **Установка дополнительных компонентов**
+   ```bash
+   # Установка Grafana
+   ./install-grafana.sh
+   
+   # Установка KubeSphere с кастомными настройками
+   export KUBESPHERE_ADMIN="custom_admin"
+   export KUBESPHERE_PASSWORD="custom_password"
+   ./install-kubesphere.sh
+   ```
+
+### 🔍 Проверка установки
+
+1. **Проверка Kubernetes:**
+   ```bash
+   kubectl get nodes
+   kubectl get pods --all-namespaces
+   ```
+
+2. **Проверка KubeSphere:**
+   ```bash
+   kubectl get pods -n kubesphere-system
+   kubectl get svc/ks-console -n kubesphere-system
+   ```
+
+3. **Проверка Grafana:**
+   ```bash
+   kubectl get pods -n monitoring
+   kubectl get svc/grafana -n monitoring
+   ```
+
+### ⚠️ Возможные проблемы
+
+1. **Ошибка подключения к серверу**
+   - Проверьте доступность сервера: `ping $SERVER_IP`
+   - Проверьте SSH доступ: `ssh $SERVER_USER@$SERVER_IP`
+   - Убедитесь, что порты 22, 6443, 30880, 30881 открыты
+
+2. **Ошибки установки Kubernetes**
+   - Проверьте системные требования
+   - Убедитесь, что swap отключен: `free -h`
+   - Проверьте логи: `journalctl -xeu kubelet`
+
+3. **Проблемы с KubeSphere**
+   - Проверьте статус установки: `kubectl logs -n kubesphere-system $(kubectl get pod -n kubesphere-system -l app=ks-install -o jsonpath='{.items[0].metadata.name}') -f`
+   - Убедитесь, что все зависимости установлены
+
+### 🔄 Обновление компонентов
+
+1. **Обновление Kubernetes:**
+   ```bash
+   apt update
+   apt-get install -y kubelet kubeadm kubectl
+   kubeadm upgrade plan
+   kubeadm upgrade apply
+   ```
+
+2. **Обновление KubeSphere:**
+   ```bash
+   kubectl apply -f https://github.com/kubesphere/ks-installer/releases/download/v3.4.1/kubesphere-installer.yaml
+   kubectl apply -f https://github.com/kubesphere/ks-installer/releases/download/v3.4.1/cluster-configuration.yaml
+   ```
+
+3. **Обновление Grafana:**
+   ```bash
+   helm repo update
+   helm upgrade grafana grafana/grafana -n monitoring
+   ```
+
+### 🧹 Очистка
+
+Если вам нужно удалить установленные компоненты:
+
+```bash
+# Удаление Grafana
+helm uninstall grafana -n monitoring
+kubectl delete namespace monitoring
+
+# Удаление KubeSphere
+kubectl delete -f https://github.com/kubesphere/ks-installer/releases/download/v3.4.1/kubesphere-installer.yaml
+kubectl delete -f https://github.com/kubesphere/ks-installer/releases/download/v3.4.1/cluster-configuration.yaml
+
+# Удаление Kubernetes
+kubeadm reset
+apt-get purge -y kubeadm kubectl kubelet kubernetes-cni
+apt-get autoremove -y
+rm -rf ~/.kube
+```
+
 ## 📁 Структура проекта
 ```
 k8s-kubesphere-deployment/
