@@ -11,6 +11,14 @@
 - [Безопасность](#безопасность)
 - [Продвинутые техники](#продвинутые-техники)
 - [Интеграция и CI/CD](#интеграция-и-cicd)
+- [Helm в облачных провайдерах](#helm-в-облачных-провайдерах)
+- [GitOps и CI/CD интеграция](#gitops-и-cicd-интеграция)
+- [Продвинутая отладка](#продвинутая-отладка)
+- [Миграция между версиями](#миграция-между-версиями)
+- [Разработка плагинов](#разработка-плагинов)
+- [Продвинутая безопасность](#продвинутая-безопасность)
+- [Мониторинг и метрики](#мониторинг-и-метрики)
+- [Дополнительные ресурсы](#дополнительные-ресурсы)
 
 ## 🚀 Основы Helm
 
@@ -354,11 +362,343 @@ kubectl apply --dry-run=client -f <(helm template mychart)
 helm install --dry-run --debug mychart
 ```
 
+## ☁️ Helm в облачных провайдерах
+
+### 🌐 AWS EKS
+```bash
+# Настройка AWS CLI и kubectl
+aws eks update-kubeconfig --name cluster-name --region region
+
+# Установка AWS EKS чартов
+helm repo add eks https://aws.github.io/eks-charts
+helm repo update
+
+# Установка AWS Load Balancer Controller
+helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+  -n kube-system \
+  --set clusterName=cluster-name
+
+# Установка AWS EBS CSI Driver
+helm install aws-ebs-csi-driver eks/aws-ebs-csi-driver \
+  -n kube-system
+
+# Установка AWS CloudWatch Agent
+helm install cloudwatch eks/aws-cloudwatch-metrics \
+  -n amazon-cloudwatch
+```
+
+### 🌊 Azure AKS
+```bash
+# Подключение к AKS
+az aks get-credentials --resource-group myResourceGroup --name myAKSCluster
+
+# Установка AGIC (Application Gateway Ingress Controller)
+helm repo add application-gateway-kubernetes-ingress \
+  https://appgwingress.blob.core.windows.net/ingress-azure-helm-package/
+helm install ingress-azure \
+  -f helm-config.yaml \
+  application-gateway-kubernetes-ingress/ingress-azure
+
+# Установка Azure Monitor
+helm install azure-monitor \
+  --namespace monitoring \
+  azure/azure-monitor-containers
+
+# Установка Azure Service Operator
+helm repo add azure-service-operator \
+  https://raw.githubusercontent.com/Azure/azure-service-operator/master/charts
+helm install aso azure-service-operator/azure-service-operator \
+  --namespace azure-service-operator \
+  --create-namespace
+```
+
+### 🌎 Google GKE
+```bash
+# Подключение к GKE
+gcloud container clusters get-credentials cluster-name --region region
+
+# Установка Google Cloud Monitoring
+helm install prometheus-operator stable/prometheus-operator \
+  --set prometheusOperator.createCustomResource=false
+
+# Установка Cloud Storage CSI Driver
+helm install csi-driver \
+  https://raw.githubusercontent.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver/master/deploy/helm/charts/gcp-compute-persistent-disk-csi-driver
+
+# Установка GKE Ingress Controller
+helm install ingress-nginx ingress-nginx/ingress-nginx \
+  --set controller.service.loadBalancerIP=YOUR_STATIC_IP
+```
+
+## 🔄 GitOps и CI/CD интеграция
+
+### 🚢 ArgoCD
+```bash
+# Установка ArgoCD
+helm repo add argo https://argoproj.github.io/argo-helm
+helm install argocd argo/argo-cd \
+  --namespace argocd \
+  --create-namespace
+
+# Конфигурация приложения в ArgoCD
+cat <<EOF | kubectl apply -f -
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/my-org/my-app
+    targetRevision: HEAD
+    path: helm
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: my-app
+EOF
+
+# Синхронизация приложения
+argocd app sync my-app
+
+# Просмотр статуса синхронизации
+argocd app get my-app
+```
+
+### ⚡ Flux CD
+```bash
+# Установка Flux
+helm repo add fluxcd https://charts.fluxcd.io
+helm install flux fluxcd/flux \
+  --namespace flux \
+  --set git.url=git@github.com:my-org/my-repo
+
+# Установка Helm Operator
+helm install helm-operator fluxcd/helm-operator \
+  --namespace flux \
+  --set git.ssh.secretName=flux-git-deploy
+
+# Создание HelmRelease
+cat <<EOF | kubectl apply -f -
+apiVersion: helm.fluxcd.io/v1
+kind: HelmRelease
+metadata:
+  name: my-release
+  namespace: default
+spec:
+  chart:
+    repository: https://charts.bitnami.com/bitnami
+    name: wordpress
+    version: 10.0.0
+EOF
+
+# Проверка статуса релиза
+kubectl describe helmrelease my-release
+```
+
+## 🔍 Продвинутая отладка
+
+### 🐛 Отладка шаблонов
+```bash
+# Отладка с подробным выводом
+helm template mychart --debug --set key=value
+
+# Проверка конкретного шаблона
+helm template mychart --show-only templates/deployment.yaml
+
+# Проверка встроенных объектов
+helm template mychart --debug | grep "Release\|Chart\|Values"
+
+# Валидация манифестов
+helm template mychart | kubectl apply --dry-run=client -f -
+
+# Проверка синтаксиса Go templates
+helm lint mychart --strict
+```
+
+### 📊 Анализ производительности
+```bash
+# Время выполнения команд
+time helm install myrelease mychart
+
+# Профилирование памяти
+helm --debug install myrelease mychart 2> helm-debug.log
+
+# Анализ размера чарта
+du -h mychart
+
+# Проверка зависимостей
+helm dep build mychart --debug
+```
+
+## 🔄 Миграция между версиями
+
+### 🔀 Helm 2 to Helm 3
+```bash
+# Установка плагина 2to3
+helm plugin install https://github.com/helm/helm-2to3
+
+# Миграция конфигурации
+helm 2to3 move config
+
+# Миграция релизов
+helm 2to3 convert RELEASE_NAME
+
+# Очистка Helm 2 данных
+helm 2to3 cleanup
+```
+
+### 📦 Обновление чартов
+```bash
+# Проверка совместимости
+helm template old-chart --api-versions
+
+# Миграция values
+helm show values old-chart > values-old.yaml
+helm show values new-chart > values-new.yaml
+diff values-old.yaml values-new.yaml
+
+# Тестовое обновление
+helm upgrade --dry-run --debug myrelease new-chart
+```
+
+## 🔌 Разработка плагинов
+
+### 🛠️ Создание плагина
+```bash
+# Структура плагина
+mkdir -p helm-myplugin
+cd helm-myplugin
+cat <<EOF > plugin.yaml
+name: "myplugin"
+version: "0.1.0"
+usage: "My custom plugin"
+description: "This is my custom Helm plugin"
+command: "$HELM_PLUGIN_DIR/myplugin.sh"
+hooks:
+  install: "cd $HELM_PLUGIN_DIR; scripts/install.sh"
+EOF
+
+# Создание скрипта плагина
+cat <<EOF > myplugin.sh
+#!/bin/bash
+echo "Hello from my plugin!"
+EOF
+chmod +x myplugin.sh
+
+# Установка плагина
+helm plugin install ./helm-myplugin
+```
+
+### 🎮 Примеры плагинов
+```bash
+# Плагин для S3
+helm plugin install https://github.com/hypnoglow/helm-s3.git
+helm s3 init s3://my-bucket/charts
+
+# Плагин для GCS
+helm plugin install https://github.com/hayorov/helm-gcs.git
+helm gcs init gs://my-bucket/charts
+
+# Плагин для Azure
+helm plugin install https://github.com/Azure/helm-azure-storage
+helm azure init azure://my-container/charts
+```
+
+## 🔒 Продвинутая безопасность
+
+### 🛡️ RBAC и PSP
+```bash
+# Создание ServiceAccount для Helm
+kubectl create serviceaccount tiller
+kubectl create clusterrolebinding tiller \
+  --clusterrole=cluster-admin \
+  --serviceaccount=kube-system:tiller
+
+# Установка с RBAC
+helm install myrelease mychart \
+  --set serviceAccount.create=true \
+  --set serviceAccount.name=myapp
+
+# Настройка Pod Security Policy
+cat <<EOF | kubectl apply -f -
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: helm-psp
+spec:
+  privileged: false
+  seLinux:
+    rule: RunAsAny
+  runAsUser:
+    rule: MustRunAsNonRoot
+EOF
+```
+
+### 🔐 Шифрование секретов
+```bash
+# Установка plugin для секретов
+helm plugin install https://github.com/jkroepke/helm-secrets
+
+# Шифрование values
+helm secrets enc secrets.yaml
+
+# Установка с зашифрованными values
+helm secrets install myrelease mychart -f secrets.yaml
+
+# Просмотр расшифрованных values
+helm secrets view secrets.yaml
+```
+
+## 📈 Мониторинг и метрики
+
+### 📊 Prometheus и Grafana
+```bash
+# Установка стека мониторинга
+helm repo add prometheus-community \
+  https://prometheus-community.github.io/helm-charts
+helm install prometheus prometheus-community/kube-prometheus-stack
+
+# Добавление аннотаций для сбора метрик
+annotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9090"
+
+# Настройка алертов
+helm upgrade prometheus prometheus-community/kube-prometheus-stack \
+  --set alertmanager.config.global.slack_api_url=https://hooks.slack.com/services/XXX
+```
+
+### 📱 Визуализация
+```bash
+# Установка Grafana dashboards
+helm install grafana grafana/grafana \
+  --set dashboards.default=true
+
+# Настройка Loki
+helm install loki grafana/loki-stack \
+  --set grafana.enabled=true
+
+# Установка Jaeger
+helm install jaeger jaegertracing/jaeger \
+  --set provisionDataStore.cassandra=false
+```
+
 ---
 
-## 📝 Лицензия
-MIT License - свободно используйте для ваших проектов.
+## 📚 Дополнительные ресурсы
 
----
+### 📖 Документация
+- [Helm Documentation](https://helm.sh/docs/)
+- [Helm Hub](https://artifacthub.io/)
+- [Helm GitHub](https://github.com/helm/helm)
 
-🌟 Надеемся, это руководство поможет вам в работе с Helm!
+### 🛠️ Инструменты
+- [Helmfile](https://github.com/roboll/helmfile)
+- [Helm Dashboard](https://github.com/komodorio/helm-dashboard)
+- [Chart Testing](https://github.com/helm/chart-testing)
+
+### 👥 Сообщество
+- [Helm Slack](https://kubernetes.slack.com/messages/helm-users)
+- [CNCF Slack](https://slack.cncf.io/)
+- [Helm Twitter](https://twitter.com/helmpack)
