@@ -86,10 +86,19 @@ export SERVER_IP="your_server_ip"
 export SERVER_USER="your_username"
 export SERVER_PASSWORD="your_password"
 
-# Учетные данные KubeSphere (опционально)
-export KUBESPHERE_ADMIN="admin"
-export KUBESPHERE_PASSWORD="your_password"
+# Учетные данные KubeSphere
+export KUBESPHERE_IP="your_node_ip"           # IP-адрес узла для доступа к консоли
+export KUBESPHERE_PORT="30880"                # Порт консоли (по умолчанию: 30880)
+export KUBESPHERE_ADMIN="admin"               # Имя администратора (по умолчанию: admin)
+export KUBESPHERE_PASSWORD="your_password"    # Пароль администратора
+
+# Настройки Grafana
+export GRAFANA_NODE_PORT="30881"              # Порт для доступа к Grafana (по умолчанию: 30881)
+export GRAFANA_ADMIN_PASSWORD="your_password"  # Пароль администратора Grafana
+export PROMETHEUS_URL="http://prometheus-operated.kubesphere-monitoring-system.svc:9090"  # URL Prometheus
 ```
+
+> **Примечание**: Все переменные имеют значения по умолчанию. Установка переменных необходима только если вы хотите использовать другие значения.
 
 ### 📥 Использование
 
