@@ -1,0 +1,151 @@
+version: "2021.2"
+
+project:
+  name: FlexLoader GUI Deployment (Testing)
+
+stages:
+  - stage:
+      name: "Static Analysis"
+      steps:
+        - script:
+            name: "Run SonarQube Analysis"
+            script: |
+              #!/bin/bash
+              set -e
+              
+              sonar-scanner \
+                -Dsonar.projectKey=flexloader-gui \
+                -Dsonar.sources=. \
+                -Dsonar.host.url=http://sonarqube:9000 \
+                -Dsonar.login=%sonar.token%
+
+        - script:
+            name: "Security Scan"
+            script: |
+              #!/bin/bash
+              set -e
+              
+              # Run Trivy vulnerability scanner
+              trivy image ${SOURCE_REGISTRY}/${IMAGE_NAME}:${VERSION}
+              
+              # Run OWASP ZAP scan
+              zap-baseline.py -t http://staging-app:8080 -r zap-report.html
+
+  - stage:
+      name: "Integration Tests"
+      steps:
+        - script:
+            name: "Setup Test Environment"
+            script: |
+              #!/bin/bash
+              set -e
+              
+              # Deploy to testing namespace
+              helm upgrade --install flexloader-test ./charts/backend \
+                --namespace flexloader-test \
+                --set image.repository=oneway-test.registrymy.ru/flexloader-gui-backend \
+                --set image.tag=%build.number% \
+                --values ./values/test-values.yaml
+
+        - script:
+            name: "Run Integration Tests"
+            script: |
+              #!/bin/bash
+              set -e
+              
+              # Wait for deployment to be ready
+              kubectl wait --for=condition=available deployment/flexloader-test -n flexloader-test --timeout=300s
+              
+              # Run integration test suite
+              go test ./integration/... -v
+              npm run integration-test
+
+  - stage:
+      name: "Load Testing"
+      steps:
+        - script:
+            name: "K6 Load Tests"
+            script: |
+              #!/bin/bash
+              set -e
+              
+              # Run k6 load tests
+              k6 run ./tests/load-test.js
+
+  - stage:
+      name: "Deploy to Production"
+      steps:
+        - script:
+            name: "Deploy with Rollback Safety"
+            script: |
+              #!/bin/bash
+              set -e
+              
+              # Store current version for potential rollback
+              PREV_VERSION=$(kubectl get deployment flexloader-backend -n flexloader -o jsonpath='{.spec.template.spec.containers[0].image}' | cut -d: -f2)
+              echo "Previous version: ${PREV_VERSION}" > rollback-version.txt
+              
+              # Deploy new version
+              helm upgrade --install flexloader-backend ./charts/backend \
+                --namespace flexloader \
+                --set image.repository=oneway-prod.myregistry.ru/flexloader-gui-backend \
+                --set image.tag=%build.number% \
+                --values ./values/production-values.yaml
+
+        - script:
+            name: "Health Check"
+            script: |
+              #!/bin/bash
+              set -e
+              
+              # Wait for deployment and check health
+              kubectl wait --for=condition=available deployment/flexloader-backend -n flexloader --timeout=300s
+              
+              # Monitor health for 5 minutes
+              for i in {1..5}; do
+                response=$(curl -s -o /dev/null -w "%{http_code}" http://flexloader-backend/health)
+                if [ "$response" != "200" ]; then
+                  echo "Health check failed! Rolling back..."
+                  PREV_VERSION=$(cat rollback-version.txt)
+                  helm rollback flexloader-backend -n flexloader
+                  exit 1
+                fi
+                sleep 60
+              done
+
+requirements:
+  - docker
+  - helm
+  - git
+  - kubectl
+  - sonar-scanner
+  - trivy
+  - zap
+  - k6
+  - go
+  - npm
+
+parameters:
+  - name: registry.user
+    type: password
+    label: "Test Registry Username"
+  
+  - name: registry.password
+    type: password
+    label: "Test Registry Password"
+  
+  - name: registry.prod.user
+    type: password
+    label: "Production Registry Username"
+  
+  - name: registry.prod.password
+    type: password
+    label: "Production Registry Password"
+  
+  - name: kubeconfig
+    type: file
+    label: "Kubernetes Config File"
+  
+  - name: sonar.token
+    type: password
+    label: "SonarQube Token"

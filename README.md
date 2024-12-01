@@ -7,6 +7,7 @@
 - [Структура проекта](#структура-проекта)
 - [Дополнительные ресурсы](#дополнительные-ресурсы)
 - [Автоматизированная установка](#автоматизированная-установка)
+- [TeamCity Pipeline Variants](#teamcity-pipeline-variants)
 
 ## 🎯 Введение
 Добро пожаловать в руководство по развертыванию Kubernetes и KubeSphere! Этот репозиторий содержит подробную документацию и примеры для эффективной работы с Kubernetes и Helm.
@@ -256,6 +257,61 @@ chmod +x scripts/deploy.sh
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
 - [Helm](https://helm.sh/docs/intro/install/)
 - [KubeSphere](https://kubesphere.io/docs/quick-start/all-in-one-on-linux/)
+
+## TeamCity Pipeline Variants
+
+This repository contains three different TeamCity pipeline configurations for deploying the FlexLoader GUI application:
+
+### 1. Canary Deployment Pipeline (`teamcity-pipeline-canary.yaml`)
+This pipeline implements a canary deployment strategy with gradual traffic shifting:
+- Initial deployment with 10% traffic to canary
+- Health monitoring of canary deployment
+- Gradual traffic increase (25%, 50%, 75%, 100%)
+- Automatic promotion to production if health checks pass
+
+Key features:
+- Gradual rollout with traffic control
+- Continuous monitoring during deployment
+- Automatic rollback on health check failure
+
+### 2. Testing-Focused Pipeline (`teamcity-pipeline-testing.yaml`)
+This pipeline emphasizes comprehensive testing and quality assurance:
+- Static code analysis with SonarQube
+- Security scanning with Trivy and OWASP ZAP
+- Integration testing in isolated environment
+- Load testing with k6
+- Automated rollback capability
+
+Key features:
+- Multiple testing stages
+- Security vulnerability scanning
+- Performance testing
+- Safe rollback mechanism
+
+### 3. Monitoring-Enhanced Pipeline (`teamcity-pipeline-monitoring.yaml`)
+This pipeline focuses on observability and monitoring:
+- Pre-deployment resource checks
+- Prometheus metrics integration
+- Grafana dashboard setup
+- Alerting configuration
+- Log aggregation with Fluentbit
+
+Key features:
+- Resource quota verification
+- Comprehensive metrics collection
+- Alert configuration for various scenarios
+- Slack notifications integration
+- ELK stack integration for logging
+
+## Usage
+
+Choose the appropriate pipeline based on your deployment needs:
+
+1. For gradual, safe deployments use: `teamcity-pipeline-canary.yaml`
+2. For testing-intensive deployments use: `teamcity-pipeline-testing.yaml`
+3. For monitoring-focused deployments use: `teamcity-pipeline-monitoring.yaml`
+
+Each pipeline requires specific configuration parameters and infrastructure components. Ensure all requirements are met before running the pipeline.
 
 ## 🤝 Содействие
 Мы приветствуем ваш вклад в развитие проекта! Вот как вы можете помочь:

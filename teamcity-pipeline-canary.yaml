@@ -1,0 +1,156 @@
+version: "2021.2"
+
+project:
+  name: FlexLoader GUI Deployment (Canary)
+
+stages:
+  - stage:
+      name: "Build and Test"
+      steps:
+        - script:
+            name: "Run Unit Tests"
+            script: |
+              #!/bin/bash
+              set -e
+              npm run test
+              go test ./...
+
+  - stage:
+      name: "Promote Images"
+      steps:
+        - script:
+            name: "Promote Backend Image"
+            script: |
+              #!/bin/bash
+              set -e
+              
+              SOURCE_REGISTRY="oneway-test.registrymy.ru"
+              TARGET_REGISTRY="oneway-prod.myregistry.ru"
+              IMAGE_NAME="flexloader-gui-backend"
+              VERSION="%build.number%"
+              
+              docker login ${SOURCE_REGISTRY} -u %registry.user% -p %registry.password%
+              docker login ${TARGET_REGISTRY} -u %registry.prod.user% -p %registry.prod.password%
+              
+              docker pull ${SOURCE_REGISTRY}/${IMAGE_NAME}:${VERSION}
+              docker tag ${SOURCE_REGISTRY}/${IMAGE_NAME}:${VERSION} ${TARGET_REGISTRY}/${IMAGE_NAME}:${VERSION}
+              docker push ${TARGET_REGISTRY}/${IMAGE_NAME}:${VERSION}
+
+        - script:
+            name: "Promote Frontend Image"
+            script: |
+              #!/bin/bash
+              set -e
+              
+              SOURCE_REGISTRY="oneway-test.registrymy.ru"
+              TARGET_REGISTRY="oneway-prod.myregistry.ru"
+              IMAGE_NAME="flexloader-gui-frontend"
+              VERSION="%build.number%"
+              
+              docker pull ${SOURCE_REGISTRY}/${IMAGE_NAME}:${VERSION}
+              docker tag ${SOURCE_REGISTRY}/${IMAGE_NAME}:${VERSION} ${TARGET_REGISTRY}/${IMAGE_NAME}:${VERSION}
+              docker push ${TARGET_REGISTRY}/${IMAGE_NAME}:${VERSION}
+
+  - stage:
+      name: "Deploy Canary"
+      steps:
+        - script:
+            name: "Deploy Canary Version (10% traffic)"
+            script: |
+              #!/bin/bash
+              set -e
+              
+              # Deploy canary version with 10% traffic
+              helm upgrade --install flexloader-canary ./charts/backend \
+                --namespace flexloader \
+                --set image.repository=oneway-prod.myregistry.ru/flexloader-gui-backend \
+                --set image.tag=%build.number% \
+                --set canary.enabled=true \
+                --set canary.trafficWeight=10 \
+                --values ./values/canary-values.yaml
+
+        - script:
+            name: "Monitor Canary Health"
+            script: |
+              #!/bin/bash
+              set -e
+              
+              # Monitor canary deployment for 10 minutes
+              for i in {1..10}; do
+                # Check metrics and logs
+                kubectl logs -n flexloader -l app=flexloader-canary --tail=100
+                # Get prometheus metrics
+                curl -s http://prometheus:9090/api/v1/query?query=http_requests_total{app="flexloader-canary"}
+                
+                # Sleep for 1 minute
+                sleep 60
+              done
+
+  - stage:
+      name: "Promote to Production"
+      steps:
+        - script:
+            name: "Gradual Traffic Shift"
+            script: |
+              #!/bin/bash
+              set -e
+              
+              # Gradually increase traffic to canary
+              for weight in 25 50 75 100; do
+                helm upgrade flexloader-canary ./charts/backend \
+                  --namespace flexloader \
+                  --set canary.trafficWeight=$weight
+                
+                echo "Increased traffic to $weight%, waiting 5 minutes..."
+                sleep 300
+              done
+
+        - script:
+            name: "Finalize Deployment"
+            script: |
+              #!/bin/bash
+              set -e
+              
+              # Update main deployment
+              helm upgrade --install flexloader-backend ./charts/backend \
+                --namespace flexloader \
+                --set image.repository=oneway-prod.myregistry.ru/flexloader-gui-backend \
+                --set image.tag=%build.number% \
+                --values ./values/production-values.yaml
+              
+              # Remove canary deployment
+              helm uninstall flexloader-canary -n flexloader
+
+requirements:
+  - docker
+  - helm
+  - git
+  - kubectl
+  - curl
+  - prometheus-cli
+
+parameters:
+  - name: registry.user
+    type: password
+    label: "Test Registry Username"
+  
+  - name: registry.password
+    type: password
+    label: "Test Registry Password"
+  
+  - name: registry.prod.user
+    type: password
+    label: "Production Registry Username"
+  
+  - name: registry.prod.password
+    type: password
+    label: "Production Registry Password"
+  
+  - name: kubeconfig
+    type: file
+    label: "Kubernetes Config File"
+  
+  - name: canary.enabled
+    type: checkbox
+    label: "Enable Canary Deployment"
+    default: true

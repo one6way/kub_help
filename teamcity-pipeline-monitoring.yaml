@@ -1,0 +1,209 @@
+version: "2021.2"
+
+project:
+  name: FlexLoader GUI Deployment (Monitoring)
+
+stages:
+  - stage:
+      name: "Pre-deployment Checks"
+      steps:
+        - script:
+            name: "Check Resource Quotas"
+            script: |
+              #!/bin/bash
+              set -e
+              
+              # Check cluster resources
+              kubectl describe quota -n flexloader
+              
+              # Check node resources
+              kubectl describe nodes | grep -A 5 "Allocated resources"
+
+        - script:
+            name: "Verify Dependencies"
+            script: |
+              #!/bin/bash
+              set -e
+              
+              # Check required services
+              kubectl get services -n monitoring prometheus grafana alertmanager
+              kubectl get services -n logging elasticsearch kibana fluent-bit
+
+  - stage:
+      name: "Deploy with Monitoring"
+      steps:
+        - script:
+            name: "Deploy Application"
+            script: |
+              #!/bin/bash
+              set -e
+              
+              # Deploy with monitoring sidecars
+              helm upgrade --install flexloader-backend ./charts/backend \
+                --namespace flexloader \
+                --set image.repository=oneway-prod.myregistry.ru/flexloader-gui-backend \
+                --set image.tag=%build.number% \
+                --set monitoring.enabled=true \
+                --set monitoring.prometheus.scrape=true \
+                --set monitoring.grafana.dashboard=true \
+                --values ./values/production-values.yaml
+
+        - script:
+            name: "Setup Monitoring"
+            script: |
+              #!/bin/bash
+              set -e
+              
+              # Apply Prometheus ServiceMonitor
+              kubectl apply -f - <<EOF
+              apiVersion: monitoring.coreos.com/v1
+              kind: ServiceMonitor
+              metadata:
+                name: flexloader-monitor
+                namespace: flexloader
+              spec:
+                selector:
+                  matchLabels:
+                    app: flexloader-backend
+                endpoints:
+                - port: metrics
+              EOF
+              
+              # Import Grafana dashboard
+              curl -X POST \
+                -H "Content-Type: application/json" \
+                -d @./monitoring/dashboards/flexloader-dashboard.json \
+                http://grafana:3000/api/dashboards/db
+
+        - script:
+            name: "Configure Alerts"
+            script: |
+              #!/bin/bash
+              set -e
+              
+              # Apply PrometheusRule for alerts
+              kubectl apply -f - <<EOF
+              apiVersion: monitoring.coreos.com/v1
+              kind: PrometheusRule
+              metadata:
+                name: flexloader-alerts
+                namespace: flexloader
+              spec:
+                groups:
+                - name: flexloader.rules
+                  rules:
+                  - alert: HighErrorRate
+                    expr: rate(http_requests_total{status=~"5.*"}[5m]) > 0.1
+                    for: 5m
+                    labels:
+                      severity: critical
+                    annotations:
+                      summary: High error rate detected
+                  - alert: HighLatency
+                    expr: http_request_duration_seconds{quantile="0.9"} > 2
+                    for: 5m
+                    labels:
+                      severity: warning
+                    annotations:
+                      summary: High latency detected
+              EOF
+
+  - stage:
+      name: "Post-deployment Monitoring"
+      steps:
+        - script:
+            name: "Verify Metrics Collection"
+            script: |
+              #!/bin/bash
+              set -e
+              
+              # Wait for metrics to be collected
+              sleep 60
+              
+              # Query Prometheus
+              curl -G \
+                --data-urlencode 'query=rate(http_requests_total[5m])' \
+                http://prometheus:9090/api/v1/query
+
+        - script:
+            name: "Setup Log Aggregation"
+            script: |
+              #!/bin/bash
+              set -e
+              
+              # Configure Fluentbit
+              kubectl apply -f - <<EOF
+              apiVersion: logging.kubesphere.io/v1alpha2
+              kind: FluentBitConfig
+              metadata:
+                name: flexloader-logging
+                namespace: flexloader
+              spec:
+                filterSelector:
+                  matchLabels:
+                    app: flexloader-backend
+                outputSelector:
+                  matchLabels:
+                    app: elasticsearch
+              EOF
+
+        - script:
+            name: "Setup Notification Channels"
+            script: |
+              #!/bin/bash
+              set -e
+              
+              # Configure Alertmanager
+              kubectl apply -f - <<EOF
+              apiVersion: monitoring.coreos.com/v1
+              kind: Alertmanager
+              metadata:
+                name: flexloader-alerts
+                namespace: flexloader
+              spec:
+                config:
+                  global:
+                    slack_api_url: '%slack.webhook.url%'
+                  route:
+                    receiver: 'slack-notifications'
+                    group_by: ['alertname', 'cluster', 'service']
+                  receivers:
+                  - name: 'slack-notifications'
+                    slack_configs:
+                    - channel: '#flexloader-alerts'
+                      title: '{{ template "slack.default.title" . }}'
+                      text: '{{ template "slack.default.text" . }}'
+              EOF
+
+requirements:
+  - docker
+  - helm
+  - git
+  - kubectl
+  - curl
+  - prometheus-cli
+
+parameters:
+  - name: registry.user
+    type: password
+    label: "Test Registry Username"
+  
+  - name: registry.password
+    type: password
+    label: "Test Registry Password"
+  
+  - name: registry.prod.user
+    type: password
+    label: "Production Registry Username"
+  
+  - name: registry.prod.password
+    type: password
+    label: "Production Registry Password"
+  
+  - name: kubeconfig
+    type: file
+    label: "Kubernetes Config File"
+  
+  - name: slack.webhook.url
+    type: password
+    label: "Slack Webhook URL"
