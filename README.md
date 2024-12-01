@@ -7,7 +7,7 @@
 - [Структура проекта](#структура-проекта)
 - [Дополнительные ресурсы](#дополнительные-ресурсы)
 - [Автоматизированная установка](#автоматизированная-установка)
-- [TeamCity Pipeline Variants](#teamcity-pipeline-variants)
+- [Варианты Pipeline в TeamCity](#варианты-pipeline-в-teamcity)
 
 ## 🎯 Введение
 Добро пожаловать в руководство по развертыванию Kubernetes и KubeSphere! Этот репозиторий содержит подробную документацию и примеры для эффективной работы с Kubernetes и Helm.
@@ -258,60 +258,60 @@ chmod +x scripts/deploy.sh
 - [Helm](https://helm.sh/docs/intro/install/)
 - [KubeSphere](https://kubesphere.io/docs/quick-start/all-in-one-on-linux/)
 
-## TeamCity Pipeline Variants
+## Варианты Pipeline в TeamCity
 
-This repository contains three different TeamCity pipeline configurations for deploying the FlexLoader GUI application:
+В этом репозитории представлены три различные конфигурации pipeline для развертывания приложения FlexLoader GUI:
 
-### 1. Canary Deployment Pipeline (`teamcity-pipeline-canary.yaml`)
-This pipeline implements a canary deployment strategy with gradual traffic shifting:
-- Initial deployment with 10% traffic to canary
-- Health monitoring of canary deployment
-- Gradual traffic increase (25%, 50%, 75%, 100%)
-- Automatic promotion to production if health checks pass
+### 1. Pipeline с Канареечным Развертыванием (`teamcity-pipeline-canary.yaml`)
+Этот pipeline реализует стратегию канареечного развертывания с постепенным перенаправлением трафика:
+- Начальное развертывание с 10% трафика на канарейку
+- Мониторинг состояния канареечного развертывания
+- Постепенное увеличение трафика (25%, 50%, 75%, 100%)
+- Автоматическое продвижение в production при успешных проверках
 
-Key features:
-- Gradual rollout with traffic control
-- Continuous monitoring during deployment
-- Automatic rollback on health check failure
+Основные особенности:
+- Постепенный rollout с контролем трафика
+- Непрерывный мониторинг во время развертывания
+- Автоматический откат при сбое проверок
 
-### 2. Testing-Focused Pipeline (`teamcity-pipeline-testing.yaml`)
-This pipeline emphasizes comprehensive testing and quality assurance:
-- Static code analysis with SonarQube
-- Security scanning with Trivy and OWASP ZAP
-- Integration testing in isolated environment
-- Load testing with k6
-- Automated rollback capability
+### 2. Pipeline с Фокусом на Тестирование (`teamcity-pipeline-testing.yaml`)
+Этот pipeline делает упор на комплексное тестирование и обеспечение качества:
+- Статический анализ кода с помощью SonarQube
+- Сканирование безопасности с Trivy и OWASP ZAP
+- Интеграционное тестирование в изолированной среде
+- Нагрузочное тестирование с k6
+- Возможность автоматического отката
 
-Key features:
-- Multiple testing stages
-- Security vulnerability scanning
-- Performance testing
-- Safe rollback mechanism
+Основные особенности:
+- Множественные этапы тестирования
+- Сканирование уязвимостей безопасности
+- Тестирование производительности
+- Безопасный механизм отката
 
-### 3. Monitoring-Enhanced Pipeline (`teamcity-pipeline-monitoring.yaml`)
-This pipeline focuses on observability and monitoring:
-- Pre-deployment resource checks
-- Prometheus metrics integration
-- Grafana dashboard setup
-- Alerting configuration
-- Log aggregation with Fluentbit
+### 3. Pipeline с Расширенным Мониторингом (`teamcity-pipeline-monitoring.yaml`)
+Этот pipeline фокусируется на наблюдаемости и мониторинге:
+- Проверка ресурсов перед развертыванием
+- Интеграция с Prometheus
+- Настройка дашбордов Grafana
+- Конфигурация оповещений
+- Агрегация логов с Fluentbit
 
-Key features:
-- Resource quota verification
-- Comprehensive metrics collection
-- Alert configuration for various scenarios
-- Slack notifications integration
-- ELK stack integration for logging
+Основные особенности:
+- Проверка квот ресурсов
+- Комплексный сбор метрик
+- Настройка оповещений для различных сценариев
+- Интеграция со Slack для уведомлений
+- Интеграция с ELK stack для логирования
 
-## Usage
+## Использование
 
-Choose the appropriate pipeline based on your deployment needs:
+Выберите подходящий pipeline в зависимости от ваших потребностей:
 
-1. For gradual, safe deployments use: `teamcity-pipeline-canary.yaml`
-2. For testing-intensive deployments use: `teamcity-pipeline-testing.yaml`
-3. For monitoring-focused deployments use: `teamcity-pipeline-monitoring.yaml`
+1. Для постепенного, безопасного развертывания используйте: `teamcity-pipeline-canary.yaml`
+2. Для развертывания с упором на тестирование используйте: `teamcity-pipeline-testing.yaml`
+3. Для развертывания с фокусом на мониторинг используйте: `teamcity-pipeline-monitoring.yaml`
 
-Each pipeline requires specific configuration parameters and infrastructure components. Ensure all requirements are met before running the pipeline.
+Каждый pipeline требует определенных параметров конфигурации и компонентов инфраструктуры. Убедитесь, что все требования выполнены перед запуском pipeline.
 
 ## 🤝 Содействие
 Мы приветствуем ваш вклад в развитие проекта! Вот как вы можете помочь:
