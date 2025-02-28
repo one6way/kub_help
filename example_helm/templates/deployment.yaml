@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-deployment
+  labels:
+    app: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+    spec:
+      initContainers:
+        - name: init-scripts
+          image: busybox
+          command: ['sh', '-c', 'echo Initializing... && cp /scripts/* /app/scripts/']
+          volumeMounts:
+            - name: scripts-volume
+              mountPath: {{ .Values.paths.scripts }}
+
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          env:
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel }}
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/config
+            - name: lib-volume
+              mountPath: {{ .Values.paths.lib }}
+            - name: drivers-volume
+              mountPath: {{ .Values.paths.drivers }}
+
+      volumes:
+        - name: config-volume
+          configMap:
+            name: {{ .Release.Name }}-config
+        - name: scripts-volume
+          hostPath:
+            path: /path/to/scripts
+        - name: lib-volume
+          hostPath:
+            path: /path/to/lib
+        - name: drivers-volume
+          hostPath:
+            path: /path/to/drivers
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }} 

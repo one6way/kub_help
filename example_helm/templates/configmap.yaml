@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+data:
+  config.properties: |
+    # Пример содержимого config.properties
+    key1=value1
+    key2=value2
+
+  log4j2.properties: |
+    # Пример содержимого log4j2.properties
+    log4j.rootLogger=INFO, console
+    log4j.appender.console=org.apache.log4j.ConsoleAppender
+    log4j.appender.console.layout=org.apache.log4j.PatternLayout
+    log4j.appender.console.layout.ConversionPattern=%d [%t] %-5p %c - %m%n 
