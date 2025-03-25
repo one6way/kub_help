@@ -1,0 +1,111 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: spark-streaming
+  namespace: spark
+spec:
+  serviceName: "spark-streaming"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spark-streaming
+  template:
+    metadata:
+      labels:
+        app: spark-streaming
+    spec:
+      terminationGracePeriodSeconds: 120
+      serviceAccountName: spark-sa
+      containers:
+      - name: spark-streaming
+        image: spark-streaming:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/bash
+        - -c
+        - |
+          spark-submit \
+          --master local[*] \
+          --conf spark.jars.packages=org.apache.spark:spark-sql-kafka-0-10_2.12:3.2.0,org.postgresql:postgresql:42.2.23 \
+          --conf spark.sql.streaming.checkpointLocation=/checkpoint \
+          --conf spark.kafka.ssl.keystore.location=/etc/kafka/ssl/keystore.jks \
+          --conf spark.kafka.ssl.truststore.location=/etc/kafka/ssl/truststore.jks \
+          --conf spark.kafka.ssl.keystore.password=${KEYSTORE_PASSWORD} \
+          --conf spark.kafka.ssl.truststore.password=${TRUSTSTORE_PASSWORD} \
+          /app/structured-streaming-app.py
+        env:
+        - name: KEYSTORE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kafka-ssl-passwords
+              key: keystore-password
+        - name: TRUSTSTORE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kafka-ssl-passwords
+              key: truststore-password
+        - name: ADB_URL
+          valueFrom:
+            secretKeyRef:
+              name: adb-credentials
+              key: url
+        - name: ADB_USER
+          valueFrom:
+            secretKeyRef:
+              name: adb-credentials
+              key: username
+        - name: ADB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: adb-credentials
+              key: password
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: "kafka-broker:9093"
+        - name: KAFKA_TOPIC
+          value: "source-topic"
+        volumeMounts:
+        - name: checkpoint-storage
+          mountPath: /checkpoint
+        - name: kafka-certs
+          mountPath: /etc/kafka/ssl
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1"
+          limits:
+            memory: "4Gi"
+            cpu: "2"
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - ps -ef | grep spark-submit | grep -v grep
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - ps -ef | grep spark-submit | grep -v grep
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: kafka-certs
+        secret:
+          secretName: kafka-ssl-certs
+          items:
+          - key: keystore.jks
+            path: keystore.jks
+          - key: truststore.jks
+            path: truststore.jks
+  volumeClaimTemplates:
+  - metadata:
+      name: checkpoint-storage
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: "standard"
+      resources:
+        requests:
+          storage: 10Gi 

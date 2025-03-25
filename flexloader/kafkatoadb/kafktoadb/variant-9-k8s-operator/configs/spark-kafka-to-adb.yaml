@@ -1,0 +1,73 @@
+apiVersion: "sparkoperator.k8s.io/v1beta2"
+kind: SparkApplication
+metadata:
+  name: kafka-to-adb
+  namespace: spark
+spec:
+  type: Python
+  mode: cluster
+  image: "apache/spark:3.3.0"
+  imagePullPolicy: IfNotPresent
+  pythonVersion: "3"
+  mainApplicationFile: "local:///opt/spark/work-dir/sparkapp.py"
+  sparkVersion: "3.3.0"
+  restartPolicy:
+    type: OnFailure
+    onFailureRetries: 3
+    onFailureRetryInterval: 10
+    onSubmissionFailureRetries: 3
+    onSubmissionFailureRetryInterval: 20
+  timeToLiveSeconds: 86400
+  driver:
+    cores: 1
+    coreLimit: "1200m"
+    memory: "2048m"
+    labels:
+      version: 3.3.0
+    serviceAccount: spark-sa
+    volumeMounts:
+      - name: kafka-certs
+        mountPath: /etc/kafka-certs
+        readOnly: true
+  executor:
+    cores: 1
+    instances: 2
+    memory: "2048m"
+    labels:
+      version: 3.3.0
+    volumeMounts:
+      - name: kafka-certs
+        mountPath: /etc/kafka-certs
+        readOnly: true
+  volumes:
+    - name: kafka-certs
+      secret:
+        secretName: kafka-ssl-certs
+  deps:
+    packages:
+      - org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0
+      - org.postgresql:postgresql:42.3.3
+  sparkConf:
+    "spark.kubernetes.executor.podNamePrefix": "kafka-to-adb"
+    "spark.kubernetes.driver.secrets.kafka-ssl-certs": "/etc/kafka-certs"
+    "spark.kubernetes.executor.secrets.kafka-ssl-certs": "/etc/kafka-certs"
+  envVars:
+    KAFKA_BOOTSTRAP_SERVERS: "kafka-broker1:9093,kafka-broker2:9093,kafka-broker3:9093,kafka-broker4:9093"
+    KAFKA_TOPIC: "source-topic"
+    KAFKA_SECURITY_PROTOCOL: "SSL"
+    KAFKA_SSL_KEYSTORE_LOCATION: "/etc/kafka-certs/keystore.jks"
+    KAFKA_SSL_KEYSTORE_TYPE: "JKS"
+    KAFKA_SSL_TRUSTSTORE_LOCATION: "/etc/kafka-certs/truststore.jks"
+    KAFKA_SSL_TRUSTSTORE_TYPE: "JKS"
+    ADB_URL: "jdbc:postgresql://adb-host:5432/database"
+    ADB_USER: "adb_user"
+  envSecrets:
+    KAFKA_SSL_KEYSTORE_PASSWORD:
+      name: kafka-ssl-passwords
+      key: keystore-password
+    KAFKA_SSL_TRUSTSTORE_PASSWORD:
+      name: kafka-ssl-passwords
+      key: truststore-password
+    ADB_PASSWORD:
+      name: adb-credentials
+      key: password 

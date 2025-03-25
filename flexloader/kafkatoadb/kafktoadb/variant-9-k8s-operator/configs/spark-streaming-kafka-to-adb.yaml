@@ -1,0 +1,76 @@
+apiVersion: "sparkoperator.k8s.io/v1beta2"
+kind: SparkApplication
+metadata:
+  name: kafka-streaming-to-adb
+  namespace: spark
+spec:
+  type: Python
+  mode: cluster
+  image: "apache/spark:3.3.0"
+  imagePullPolicy: IfNotPresent
+  pythonVersion: "3"
+  mainApplicationFile: "local:///opt/spark/work-dir/structured-streaming-app.py"
+  sparkVersion: "3.3.0"
+  restartPolicy:
+    type: Always
+  driver:
+    cores: 1
+    coreLimit: "1200m"
+    memory: "2048m"
+    labels:
+      version: 3.3.0
+    serviceAccount: spark-sa
+    volumeMounts:
+      - name: kafka-certs
+        mountPath: /etc/kafka-certs
+        readOnly: true
+      - name: checkpoint
+        mountPath: /checkpoint
+  executor:
+    cores: 1
+    instances: 2
+    memory: "2048m"
+    labels:
+      version: 3.3.0
+    volumeMounts:
+      - name: kafka-certs
+        mountPath: /etc/kafka-certs
+        readOnly: true
+      - name: checkpoint
+        mountPath: /checkpoint
+  volumes:
+    - name: kafka-certs
+      secret:
+        secretName: spark-user
+    - name: checkpoint
+      persistentVolumeClaim:
+        claimName: spark-checkpoint-pvc
+  deps:
+    packages:
+      - org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0
+      - org.postgresql:postgresql:42.3.3
+  sparkConf:
+    "spark.kubernetes.executor.podNamePrefix": "kafka-streaming-to-adb"
+    "spark.kubernetes.driver.secrets.spark-user": "/etc/kafka-certs"
+    "spark.kubernetes.executor.secrets.spark-user": "/etc/kafka-certs"
+    "spark.sql.streaming.checkpointLocation": "/checkpoint"
+  envVars:
+    KAFKA_BOOTSTRAP_SERVERS: "kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9093"
+    KAFKA_TOPIC: "source-topic"
+    KAFKA_SECURITY_PROTOCOL: "SSL"
+    KAFKA_SSL_KEYSTORE_LOCATION: "/etc/kafka-certs/user.p12"
+    KAFKA_SSL_KEYSTORE_TYPE: "PKCS12"
+    KAFKA_SSL_TRUSTSTORE_LOCATION: "/etc/kafka-certs/ca.p12"
+    KAFKA_SSL_TRUSTSTORE_TYPE: "PKCS12"
+    ADB_URL: "jdbc:postgresql://adb-host:5432/database"
+    ADB_USER: "adb_user"
+  envSecrets:
+    KAFKA_SSL_KEYSTORE_PASSWORD:
+      name: spark-user
+      key: user.password
+    KAFKA_SSL_TRUSTSTORE_PASSWORD:
+      name: spark-user
+      key: ca.password
+    ADB_PASSWORD:
+      name: adb-credentials
+      key: password 

@@ -1,0 +1,44 @@
+# Установка Spark Operator
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: spark-operator
+  namespace: spark-operator
+spec:
+  repo: https://googlecloudplatform.github.io/spark-on-k8s-operator
+  chart: spark-operator
+  version: 1.1.20
+  targetNamespace: spark-operator
+  valuesContent: |-
+    webhook:
+      enable: true
+    metrics:
+      enable: true
+    sparkJobNamespace:
+      - spark
+---
+# Установка Strimzi Kafka Operator
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: strimzi-kafka-operator
+  namespace: kafka
+spec:
+  repo: https://strimzi.io/charts/
+  chart: strimzi-kafka-operator
+  version: 0.31.1
+  targetNamespace: kafka
+---
+# Установка Cert-Manager
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: cert-manager
+  namespace: cert-manager
+spec:
+  repo: https://charts.jetstack.io
+  chart: cert-manager
+  version: v1.9.1
+  targetNamespace: cert-manager
+  valuesContent: |-
+    installCRDs: true 

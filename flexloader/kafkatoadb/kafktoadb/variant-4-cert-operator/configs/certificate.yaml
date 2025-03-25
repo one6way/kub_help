@@ -1,0 +1,51 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: kafka-client-cert
+  namespace: spark-namespace
+spec:
+  # Секрет, в который будут сохранены сертификаты
+  secretName: kafka-client-certs
+  # Длительность действия сертификата
+  duration: 2160h # 90 дней
+  # Обновлять за 30 дней до истечения срока
+  renewBefore: 720h # 30 дней
+  # Использовать ранее настроенный ClusterIssuer или Issuer
+  issuerRef:
+    name: kafka-issuer
+    kind: ClusterIssuer
+    group: cert-manager.io
+  # Общее имя в сертификате
+  commonName: spark-app
+  # Дополнительные имена
+  dnsNames:
+  - spark-app
+  - "*.spark-namespace.svc.cluster.local"
+  # Альтернативные имена для IP-адресов
+  ipAddresses:
+  - 127.0.0.1
+  # Скрипт для генерации keystore/truststore JKS формата после выпуска сертификата
+  # Будет вызван после создания сертификата cert-manager'ом
+  postStart:
+    exec:
+      command:
+      - "/bin/sh"
+      - "-c"
+      - |
+        # Создание keystore.jks из выпущенных сертификатов
+        openssl pkcs12 -export -in /etc/certs/tls.crt -inkey /etc/certs/tls.key \
+          -name kafka-client -out /etc/certs/kafka-client.p12 \
+          -password pass:${KEYSTORE_PASSWORD}
+        
+        # Конвертация PKCS12 в JKS
+        keytool -importkeystore \
+          -srckeystore /etc/certs/kafka-client.p12 -srcstoretype PKCS12 -srcstorepass ${KEYSTORE_PASSWORD} \
+          -destkeystore /etc/certs/keystore.jks -deststoretype JKS -deststorepass ${KEYSTORE_PASSWORD}
+        
+        # Создание truststore.jks из CA сертификата
+        keytool -import -noprompt -trustcacerts \
+          -alias ca -file /etc/certs/ca.crt \
+          -keystore /etc/certs/truststore.jks -storepass ${TRUSTSTORE_PASSWORD}
+        
+        # Установка прав доступа
+        chmod 440 /etc/certs/keystore.jks /etc/certs/truststore.jks 

@@ -1,0 +1,24 @@
+# Создаем ConfigMap только если включена конфигурация Spark
+{{- if .Values.spark.config.enabled }}
+# Версия API Kubernetes для ConfigMap
+apiVersion: v1
+# Тип ресурса
+kind: ConfigMap
+metadata:
+  # Имя ConfigMap, включает имя релиза и суффикс
+  name: {{ include "flexloader.fullname" . }}-spark-config
+  # Метки для идентификации ресурса
+  labels:
+    {{- include "flexloader.labels" . | nindent 4 }}
+# Данные ConfigMap
+data:
+  # Файл конфигурации Spark
+  spark.conf: |
+    # Итерация по всем свойствам Spark из values.yaml
+    {{- range $key, $value := .Values.spark.config.properties }}
+    {{ $key }}={{ $value }}
+    {{- end }}
+    # Добавляем пароль из переменной окружения
+    # Это позволяет безопасно получить пароль из секрета Kubernetes
+    spark.sql.catalog.metadata.password=${DB_PASSWORD}
+{{- end }} 

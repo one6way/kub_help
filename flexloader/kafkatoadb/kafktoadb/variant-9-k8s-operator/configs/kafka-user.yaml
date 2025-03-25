@@ -1,0 +1,25 @@
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaUser
+metadata:
+  name: spark-user
+  namespace: kafka
+  labels:
+    strimzi.io/cluster: kafka-cluster
+spec:
+  authentication:
+    type: tls
+  authorization:
+    type: simple
+    acls:
+      - resource:
+          type: topic
+          name: source-topic
+          patternType: literal
+        operation: Read
+        host: "*"
+      - resource:
+          type: group
+          name: spark-consumer-group
+          patternType: literal
+        operation: Read
+        host: "*" 
