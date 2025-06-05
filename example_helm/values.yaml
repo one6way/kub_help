@@ -1,0 +1,33 @@
+replicaCount: 1
+
+image:
+  repository: myrepo/myapp # Замените на ваш Docker image
+  tag: "2.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+
+resources:
+  limits:
+    cpu: 100m
+    memory: 128Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+config:
+  logLevel: INFO
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Пути к библиотекам и драйверам
+paths:
+  lib: /app/lib
+  drivers: /app/drivers
+  scripts: /app/scripts 
